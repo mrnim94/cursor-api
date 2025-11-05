@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.19
 
 ARG GO_VERSION=1.25.1
 ARG TARGETOS=linux
