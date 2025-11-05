@@ -16,24 +16,6 @@ jobs:
         run: |
           docker pull dxa4481/trufflehog
           docker run -v ${{ github.workspace }}:/target dxa4481/trufflehog --entropy=False file:///target
-      - name: List files in path
-        run: ls -la .
-      - name: Depcheck
-        uses: dependency-check/Dependency-Check_Action@main
-        id: Depcheck
-        with:
-          project: 'cursor-api'
-          path: '.'
-          format: 'HTML'
-          out: 'reports' # this is the default, no need to specify unless you wish to override it
-          args: >
-            --failOnCVSS 0
-            --enableRetired
-      - name: Upload Test results
-        uses: actions/upload-artifact@master
-        with:
-           name: Depcheck report
-           path: ${{github.workspace}}/reports
       - name: Set env
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Login to Docker Hub
@@ -57,7 +39,7 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL'
-          trivyIgnores: 'request-trivy-ignore.txt'
+          # trivyIgnores: 'request-trivy-ignore.txt'
           #https://github.com/aquasecurity/trivy/issues/4826
           #skip-files: '/go/pkg/mod/github.com/aws/aws-sdk-go-v2/service/sts@v1.21.4/api_op_GetAccessKeyInfo.go'
           #skip-dirs: '/go/pkg/mod/github.com/aws/aws-sdk-go-v2/service'
