@@ -68,7 +68,7 @@ func generate(c echo.Context) error {
 	if agentCmd == "" {
 		agentCmd = "cursor-agent"
 	}
-	cmd := exec.CommandContext(ctx, agentCmd, "chat", prompt)
+	cmd := exec.CommandContext(ctx, agentCmd, "chat", "--model", model, prompt)
 	env := os.Environ()
 	if apiKey != "" {
 		env = append(env, "CURSOR_API_KEY="+apiKey)

@@ -25,7 +25,7 @@ docker run --rm -p 1994:1994 cursor-api
 ### Make a request (Linux/macOS)
 ```bash
 curl -sS \
-  -X POST http://localhost:1994/v1beta/models/cursor \
+  -X POST http://localhost:1994/v1beta/models/gpt-5 \
   -H 'Content-Type: application/json' \
   -H 'x-cursor-api-key: YOUR_KEY' \
   -d '{
