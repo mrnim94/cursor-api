@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl bash xz-utils tar && \
     rm -rf /var/lib/apt/lists/*
 
+# Pre-create log directories expected by the Go logger and make them writable
+RUN mkdir -p /log_files/info /log_files/error && chown -R 10001:10001 /log_files
+
 # Non-root user
 RUN useradd -m -u 10001 appuser
 
