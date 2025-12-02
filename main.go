@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"cursor-api/log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,6 +11,18 @@ import (
 
 	"github.com/labstack/echo/v4"
 )
+
+func init() {
+	os.Setenv("APP_NAME", "CURSOR_API")
+	logger := log.InitLogger(false)
+	// Check if KUBERNETES_SERVICE_HOST is set
+	if _, exists := os.LookupEnv("KUBERNETES_SERVICE_HOST"); !exists {
+		// If not in Kubernetes, set LOG_LEVEL to DEBUG
+		os.Setenv("LOG_LEVEL", "DEBUG")
+	}
+	logger.SetLevel(log.GetLogLevel("LOG_LEVEL"))
+	os.Setenv("TZ", "Asia/Ho_Chi_Minh")
+}
 
 type Part struct {
 	Text string `json:"text,omitempty"`
@@ -34,10 +47,16 @@ type GenerateContentResponse struct {
 }
 
 func generate(c echo.Context) error {
+	start := time.Now()
 	model := c.Param("model")
+	log.Infof("Incoming generate request for model=%s", model)
+	defer func() {
+		log.Debugf("generate handler for model=%s finished in %s", model, time.Since(start))
+	}()
 
 	var req GenerateContentRequest
 	if err := c.Bind(&req); err != nil {
+		log.Errorf("Failed to bind request body for model=%s: %v", model, err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
@@ -55,11 +74,22 @@ func generate(c echo.Context) error {
 		}
 	}
 	if prompt == "" {
+		log.Warnf("Request for model=%s did not include any text prompt", model)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no text prompt found in contents.parts"})
+	}
+	if len(prompt) > 200 {
+		log.Debugf("Prompt preview (first 200 chars) for model=%s: %q...", model, prompt[:200])
+	} else {
+		log.Debugf("Prompt for model=%s: %q", model, prompt)
 	}
 
 	// Pass API key to Cursor Agent
 	apiKey := c.Request().Header.Get("x-cursor-api-key")
+	if apiKey == "" {
+		log.Debugf("No x-cursor-api-key header provided for model=%s; using default agent credentials", model)
+	} else {
+		log.Debugf("x-cursor-api-key header detected for model=%s", model)
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 3*time.Minute)
 	defer cancel()
@@ -69,6 +99,7 @@ func generate(c echo.Context) error {
 		agentCmd = "cursor-agent"
 	}
 	cmd := exec.CommandContext(ctx, agentCmd, "chat", "--model", model)
+	log.Debugf("Executing agent command: %s %v", agentCmd, cmd.Args[1:])
 	// Avoid very long argv by sending the prompt via stdin
 	cmd.Stdin = strings.NewReader(prompt)
 	env := os.Environ()
@@ -79,6 +110,8 @@ func generate(c echo.Context) error {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Errorf("Error executing agent command for model=%s: %v", model, err)
+		log.Debugf("Agent combined output for model=%s: %s", model, string(out))
 		return c.JSON(http.StatusBadGateway, map[string]string{
 			"error":  err.Error(),
 			"output": string(out),
@@ -98,11 +131,14 @@ func generate(c echo.Context) error {
 		},
 	}
 
+	log.Infof("Successfully generated response for model=%s (payload bytes=%d)", model, len(reply))
+
 	return c.JSON(http.StatusOK, resp)
 }
 
 func main() {
 	e := echo.New()
+	e.Use(log.LoggerHandler)
 	e.POST("/v1beta/models/:model", generate)
 	// Dùng StartTLS nếu bạn đã cấu hình cert/key; ở đây ví dụ http để tối giản
 	e.Logger.Fatal(e.Start(":1994"))
